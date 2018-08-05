@@ -6,8 +6,9 @@
 #include <Wire.h>
 #include <LCD.h>
 #include <LiquidCrystal_I2C.h>
+#include <common_for_robot.h>
 
-#define I2C_ADDR          0x27        //Define I2C Address where the PCF8574A is
+#define I2C_ADDR           0x27        //Define I2C Address where the PCF8574A is
 #define BACKLIGHT_PIN      3
 #define En_pin             2
 #define Rw_pin             1
@@ -23,34 +24,32 @@ LiquidCrystal_I2C      lcd(I2C_ADDR, En_pin,Rw_pin,Rs_pin,D4_pin,D5_pin,D6_pin,D
 #define SELECT 1
 #define NORMAL 0
 
-#define MODE_MAX_INDEX 5
+#define ALIVE_INDEX 20
+#define MOD_INDEX   30
+
+#define MODE_MAX_INDEX      5
 #define SENT_ARRAY_ELEMENTS 16
-#define ALIVE_SEND_TIME 1500
-#define CONN_LOST_TIME 3500
+#define ALIVE_SEND_TIME     1500
+#define CONN_LOST_TIME      3500
 /*Pin selections*/
 #define rightJoyXPin  A0
 #define rightJoyYPin  A1
-#define leftJoyXPin  A2
-#define leftJoyYPin  A3
-#define up  3
-#define right  4
-#define down  5
-#define left  6
-#define button4  7
-#define button3  8
-#define button2  9
-#define button1  10
-#define rightFront2  2
-#define rightFront1  12
-#define leftFront2  A6
-#define leftFront1  A7
-#define mode  11
+#define leftJoyXPin   A2
+#define leftJoyYPin   A3
+#define up            3
+#define right         4
+#define down          5
+#define left          6
+#define button4       7
+#define button3       8
+#define button2       9
+#define button1       10
+#define rightFront2   2
+#define rightFront1   12
+#define leftFront2    A6
+#define leftFront1    A7
+#define mode          11
 
-#define messageID  0x101
-#define JOY_OFFSET 0
-#define ARROW_OFFSET 6
-#define BUTTON_OFFSET 12
-#define FRONT_OFFSET 18
 
 short modeCounter, dataSendSelect, remoteMode, modeStringIndex, modeStringIndexPrev, value, prevReceivedValue, resendNum;
 bool modeRead, upRead, downRead, upReadPrev, downReadPrev, modeChange, hasNewIndex, connectionLost, devTextChange;
@@ -60,10 +59,10 @@ char* modeString[MODE_MAX_INDEX] = {"Drive only!",//0
                                     "R.arm&drive!",//3 
                                     "L.arm&drive!"};//4
                                     
-char* inputDataIDArray[] = {"rF2", "rF1", "lF2", "lF1",
+/*char* inputDataIDArray[] = {"rF2", "rF1", "lF2", "lF1",
                             "bu4", "bu3", "bu2", "bu1",
                             "up0", "rig", "lef", "dow",
-                            "rJX", "rJY", "lJX", "lJY"};
+                            "rJX", "rJY", "lJX", "lJY",};*/
 unsigned short inputDataArray[SENT_ARRAY_ELEMENTS], inputDataArray_old[SENT_ARRAY_ELEMENTS],indexArray[SENT_ARRAY_ELEMENTS];
 unsigned long lastSendTime, currTime, lastSelectTime, lastModeTime, prevSentAliveTime, lastReceivedAliveTime;
 unsigned long cycleTime = 100;
@@ -143,10 +142,21 @@ void saveOldInput(){
  * Description: Sending the ID of the data and the data itself to the receiver. 
 */
 void sendData(int index){
-  Serial.print(inputDataIDArray[index]);
-  Serial.print(inputDataArray[index]);
-  Serial.print('@');
-  Serial.print(" ");
+  if (index == ALIVE_INDEX){// nagyobb mint a inputDataIDArray maximuma
+    Serial.print("X1");
+    Serial.print('@');
+    Serial.print(" ");
+  }else if (index >= MOD_INDEX && index <= MOD_INDEX+4){// kell egy shift a 0-4 be pl 30 és akkor 
+    Serial.print("Y");
+    Serial.print(index-MOD_INDEX);
+    Serial.print('@');
+    Serial.print(" ");  
+  }else{ // ha nem mod váltás és nem alive küldés
+    Serial.print(inputDataIDArray[index]);
+    Serial.print(inputDataArray[index]);
+    Serial.print('@');
+    Serial.print(" ");
+  }
   delay(10);
 }
 
@@ -169,7 +179,6 @@ void compareChanges(){
       k++;
       hasNewIndex = true;
     }
-   //}
   }
 }
 
@@ -226,10 +235,7 @@ void sendModeChange(int modeStringIndex_){
   handleLCD(1, 0, "change to device", true);
   modeChange = true;
   delay(750);
-  Serial.print("Mod");
-  Serial.print(modeStringIndex_);
-  Serial.print('@');
-  Serial.print(" ");
+  sendData(modeStringIndex_ + MOD_INDEX);
   sentTime = millis();
   currTime = millis();
   while(!answerReceived && (currTime - sentTime) < 5000){
@@ -237,8 +243,8 @@ void sendModeChange(int modeStringIndex_){
     if(Serial.available() > 0){              
       String input = Serial.readString();
       //Debug print
-      Serial.print("Answer ");
-      Serial.print(input);
+      //Serial.print("Answer ");
+      //Serial.print(input);
       if (input == "OK " || input == " OK " || input == " OK"){
         answerReceived = true;
         break;
@@ -316,15 +322,6 @@ void loop() {
   {
     case NORMAL:
       modeStringIndexPrev = modeStringIndex;
-      currTime = millis();
-      if (currTime - prevSentAliveTime > ALIVE_SEND_TIME){
-        prevSentAliveTime = currTime;
-        connectionLost = false;
-        devTextChange = true;
-        Serial.print("ALI1");
-        Serial.print('@');
-        Serial.print(" ");
-      }
       if (modeChange){
         modeChange = false;
         handleLCD(0, 0, "CON:", true);
@@ -347,13 +344,20 @@ void loop() {
         }
         clearIndexArray();
       }
-    currTime = millis();
-    if (currTime - lastReceivedAliveTime > CONN_LOST_TIME){
-      handleLCD(1, 0, "Connection lost!", true);
-      connectionLost = true;
-      devTextChange = false;
-      delay(750);
-    }      
+      currTime = millis();
+      if (currTime - prevSentAliveTime > ALIVE_SEND_TIME){
+        prevSentAliveTime = currTime;
+        connectionLost = false;
+        devTextChange = true;
+        sendData(ALIVE_INDEX); //ide kellene a waitforAnswer is
+      }      
+      currTime = millis();
+      if (currTime - lastReceivedAliveTime > CONN_LOST_TIME){
+        handleLCD(1, 0, "Connection lost!", true);
+        connectionLost = true;
+        devTextChange = false;
+        delay(750);
+      }      
     break;
     /*********************************************Controller selector mode*****************************************************/
     case SELECT:
@@ -418,8 +422,8 @@ void loop() {
       /*Do nothing here*/
     }else{
       if (input == '@'){//The control sign
-        command = message.substring(0,3);
-        value = message.substring(3).toInt();
+        command = message.substring(0,1);
+        value = message.substring(1).toInt();
         message = "";
         commandReceived = true;
       }else{
@@ -429,7 +433,7 @@ void loop() {
     }
     /*Serial.print("command :");
     Serial.println(command);*/
-    if (commandReceived && command == "Mod"){
+    if (commandReceived && command == "Z"){
       //debug print
       /*Serial.print("command: ");
       Serial.println(command);

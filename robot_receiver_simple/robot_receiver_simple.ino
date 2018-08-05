@@ -4,20 +4,21 @@
 */
 
 #include <SoftwareSerial.h>
+#include <common_for_robot.h>
 /*PIN definition*/
-#define RIGHT_CHAIN_PWM   5
-#define LEFT_CHAIN_PWM    6
-#define RIGHT_CHAIN_DIR1  7
-#define RIGHT_CHAIN_DIR2  8
-#define LEFT_CHAIN_DIR1   9
-#define LEFT_CHAIN_DIR2   10
+#define RIGHT_CHAIN_PWM   6
+#define LEFT_CHAIN_PWM    5
+#define RIGHT_CHAIN_DIR1  9
+#define RIGHT_CHAIN_DIR2  10
+#define LEFT_CHAIN_DIR1   7
+#define LEFT_CHAIN_DIR2   8
 #define VOLT_MEAS_PIN     A0
-#define RED_LED_PIN       A1
-#define YELLOW_LED_PIN    A2
-#define GREEN_LED1_PIN    A3
-#define GREEN_LED2_PIN    A4
-#define R_SER_RX_PIN      2
-#define R_SER_TX_PIN      3
+#define RED_LED_PIN       A4
+#define YELLOW_LED_PIN    A3
+#define GREEN_LED1_PIN    A2
+#define GREEN_LED2_PIN    A1
+#define R_SER_RX_PIN      3
+#define R_SER_TX_PIN      2
 
 /**/
 #define RECEIVED_ARRAY_ELEMENTS 16
@@ -57,10 +58,10 @@ char incomingByte;
 String message, command;
 bool commandReceived, lostConnection;
 int value, controllMode, controllModePrev;
-String inputDataIDArray[] = {"rF2", "rF1", "lF2", "lF1",
+/*String inputDataIDArray[] = {"rF2", "rF1", "lF2", "lF1",
                             "bu4", "bu3", "bu2", "bu1",
                             "up0", "rig", "lef", "dow",
-                            "rJX", "rJY", "lJX", "lJY"};
+                            "rJX", "rJY", "lJX", "lJY"};*/
 unsigned short inputDataArray[RECEIVED_ARRAY_ELEMENTS];
 unsigned long currTime, lastAliveTime, lastBattUpdateTime;
 
@@ -237,8 +238,8 @@ void loop() {
     }else{
       //Serial.println(incomingByte);
       if (incomingByte == '@'){//The control sign
-        command = message.substring(0,3);
-        value = message.substring(3).toInt();
+        command = message.substring(0,1);
+        value = message.substring(1).toInt();
         message = "";
         commandReceived = true;
       }else{
@@ -257,16 +258,17 @@ void loop() {
     Serial.println(command);
     Serial.print("value :");
     Serial.println(value);*/
-    if (command == "Mod"){
+    if (command == "Y"){
+      Serial.print("MOD");
       controllMode = value;
       receiverSerial.print("OK");
       receiverSerial.print(" ");
     }
-    else if (command == "ALI"){
+    else if (command == "X"){
       /*int rightC =  map(inputDataArray[RJX], 0, 1023, -255, 255);
       int leftC =  map(inputDataArray[LJX], 0, 1023, -255, 255);
       Serial.print("Alive Message");*/
-      receiverSerial.print("Mod");
+      receiverSerial.print("Z");
       receiverSerial.print(controllMode);
       receiverSerial.print("@");
       receiverSerial.print(" ");
@@ -324,15 +326,15 @@ void loop() {
     break;
     case R_ARM_AND_DRIVE:
       if (inputDataArray[UP0] == 0){
-        rightC = leftC = 255;
-      }else if (inputDataArray[DOW] == 0){
         rightC = leftC = -255;
+      }else if (inputDataArray[DOW] == 0){
+        rightC = leftC = 255;
       }else if (inputDataArray[LEF] == 0){
-        rightC = -200;
-        leftC = 200;
+        rightC = 215;
+        leftC = -215;
       }else if (inputDataArray[RIG] == 0){
-        rightC = 200;
-        leftC = -200;
+        rightC = -215;
+        leftC = 215;
       }else{
         rightC = leftC = 0;
       }
