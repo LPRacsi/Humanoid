@@ -157,7 +157,8 @@ void sendData(int index){
     Serial.print('@');
     Serial.print(" ");
   }
-  delay(10);
+  delay(20);
+  prevSentAliveTime = millis();
 }
 
 /*
@@ -223,6 +224,30 @@ void initInputDataArray(){
   for (i = 12; i < SENT_ARRAY_ELEMENTS; i++){
     inputDataArray[i] = 512; // Set 512 for joystic 512 = middle
   }
+}
+
+/*
+ * Function:    receiveSerialInput
+ * Description: Checks the received input from serial.
+*/
+void receiveSerialInput(){
+  if(Serial.available() > 0){              
+    input = Serial.read();
+    lastReceivedAliveTime = millis();
+    if (isWhitespace(input)){
+      /*Do nothing here*/
+    }else{
+      if (input == '@'){//The control sign
+        command = message.substring(0,1);
+        value = message.substring(1).toInt();
+        message = "";
+        commandReceived = true;
+      }else{
+        commandReceived = false;
+        message += input;
+      }
+    }
+  }  
 }
 /*
  * 
@@ -292,6 +317,7 @@ void setup() {
   remoteMode = NORMAL; 
   modeRead = HIGH; //Not pressed
   modeStringIndex = 0;
+  modeStringIndexPrev = MODE_MAX_INDEX;
   modeChange = true;
   connectionLost = true;
   lastSendTime = 0;
@@ -321,7 +347,7 @@ void loop() {
   switch(remoteMode)
   {
     case NORMAL:
-      modeStringIndexPrev = modeStringIndex;
+    modeStringIndexPrev = MODE_MAX_INDEX;
       if (modeChange){
         modeChange = false;
         handleLCD(0, 0, "CON:", true);
@@ -332,16 +358,25 @@ void loop() {
       compareChanges();
       if (hasNewIndex){ // If there is a new index, the first element of indexArray should be sent at least.
         resendNum = 2;
-        while (resendNum >= 1){
+        commandReceived = false;
+        while (!commandReceived && resendNum > 0){
           sendData(indexArray[0]);
-          for(int j = 1; j < SENT_ARRAY_ELEMENTS; j++){
-            if (indexArray[j] != 0){
+          receiveSerialInput();
+          resendNum--;  
+        }
+     
+        for(int j = 1; j < SENT_ARRAY_ELEMENTS; j++){          
+          if (indexArray[j] != 0){
+            resendNum = 2;
+            commandReceived = false;
+            while (!commandReceived && resendNum > 0){ 
               sendData(indexArray[j]);
+              receiveSerialInput();
+              resendNum--;              
             }
           }
-          resendNum--;
-          delay(50);
         }
+      //}
         clearIndexArray();
       }
       currTime = millis();
@@ -352,7 +387,7 @@ void loop() {
         sendData(ALIVE_INDEX); //ide kellene a waitforAnswer is
       }      
       currTime = millis();
-      if (currTime - lastReceivedAliveTime > CONN_LOST_TIME){
+      if (currTime - lastReceivedAliveTime > CONN_LOST_TIME && !connectionLost){
         handleLCD(1, 0, "Connection lost!", true);
         connectionLost = true;
         devTextChange = false;
@@ -391,9 +426,11 @@ void loop() {
         if (modeStringIndex < 0){
           modeStringIndex = MODE_MAX_INDEX-1;
         }
-        handleLCD(0, 1, "Selector mode!", true);
-        handleLCD(1, 0, "  ", true);
-        handleLCD(1, 2, modeString[modeStringIndex], false);
+        if (modeStringIndexPrev != modeStringIndex){          
+          handleLCD(0, 1, "Selector mode!", true);
+          handleLCD(1, 2, modeString[modeStringIndex], true);
+          modeStringIndexPrev = modeStringIndex;
+        }
       }
     break;
   }
@@ -415,45 +452,36 @@ void loop() {
     }
   }
   /***************************************Check input from receiver*************************************************/
-  if(Serial.available() > 0){              
-    input = Serial.read();
-    lastReceivedAliveTime = millis();
-    if (isWhitespace(input)){
-      /*Do nothing here*/
-    }else{
-      if (input == '@'){//The control sign
-        command = message.substring(0,1);
-        value = message.substring(1).toInt();
-        message = "";
-        commandReceived = true;
-      }else{
-        commandReceived = false;
-        message += input;
-      }
-    }
+  receiveSerialInput();
     /*Serial.print("command :");
     Serial.println(command);*/
     if (commandReceived && command == "Z"){
+      commandReceived = false; //Command already processed
       //debug print
       /*Serial.print("command: ");
       Serial.println(command);
       Serial.print("value: ");
       Serial.println(value);*/
+      /*Serial.print("value: ");
+      Serial.println(value);
+      Serial.print("modeStringIndex: ");
+      Serial.println(modeStringIndex);*/      
       if (value == modeStringIndex){
         lastReceivedAliveTime = millis();
         if(prevReceivedValue != value || devTextChange){
           handleLCD(1, 0, "DEV:", true);
           handleLCD(1, 4, modeString[modeStringIndex], false);
           devTextChange = false;
+          prevReceivedValue = value;
         }
-        prevReceivedValue = value;
+ 
       }else{
         sendModeChange(modeStringIndex);
       }
-    }else if (commandReceived){
+    }/*else if (commandReceived){
       handleLCD(0, 0, "MSG from device:", true);
       handleLCD(1, 0, command, true);
       delay(750);
-    }
-  }  
+    }*/
+  //}  
 }

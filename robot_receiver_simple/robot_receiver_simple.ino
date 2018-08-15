@@ -159,27 +159,40 @@ float getBatteryVoltage(){
 }
 
 /*
+ * Function:    sendAck
+ * Description: Sending ACK message
+*/
+void sendAck(){
+  receiverSerial.print("Z");
+  receiverSerial.print(controllMode);
+  //Serial.print("controllMode: ");
+  //Serial.println(controllMode);
+  receiverSerial.print("@");
+  receiverSerial.print(" ");
+}
+
+/*
  * Function:    checkAndSetBatteryStatus
  * Description: Sets the battery status leds and the inner state based on measured battery voltage
 */
 void checkAndSetBatteryStatus(){
   float batteryVoltage = getBatteryVoltage();
-  if (batteryVoltage > 11.60){
+  if (batteryVoltage > 11.90){
     digitalWrite(RED_LED_PIN, HIGH);
     digitalWrite(YELLOW_LED_PIN, HIGH);
     digitalWrite(GREEN_LED1_PIN, HIGH);
     digitalWrite(GREEN_LED2_PIN, HIGH);    
-  }else if (batteryVoltage > 10.80){
+  }else if (batteryVoltage > 11.40){
     digitalWrite(RED_LED_PIN, HIGH);
     digitalWrite(YELLOW_LED_PIN, HIGH);
     digitalWrite(GREEN_LED1_PIN, HIGH);
     digitalWrite(GREEN_LED2_PIN, LOW);    
-  }else if (batteryVoltage > 10.00){
+  }else if (batteryVoltage > 10.90){
     digitalWrite(RED_LED_PIN, HIGH);
     digitalWrite(YELLOW_LED_PIN, HIGH);
     digitalWrite(GREEN_LED1_PIN, LOW);
     digitalWrite(GREEN_LED2_PIN, LOW);    
-  }else if (batteryVoltage <= 10.00){
+  }else if (batteryVoltage <= 10.40){
     digitalWrite(RED_LED_PIN, HIGH);
     digitalWrite(YELLOW_LED_PIN, LOW);
     digitalWrite(GREEN_LED1_PIN, LOW);
@@ -241,7 +254,32 @@ void loop() {
         command = message.substring(0,1);
         value = message.substring(1).toInt();
         message = "";
-        commandReceived = true;
+        if (alive == command || modS == command){
+          //Serial.println("alive or mode!");        
+          commandReceived = true;
+        }else{      
+          for (int l =0; l < (sizeof(inputDataIDArray)/ sizeof(inputDataIDArray[0])); l++){          
+            /*Serial.print("(sizeof(inputDataIDArray)/ sizeof(inputDataIDArray[0])) ");
+            Serial.println((sizeof(inputDataIDArray)/ sizeof(inputDataIDArray[0])));          
+            Serial.print("l ");
+            Serial.println(l);          
+            Serial.print("inputDataIDArray[l] ");
+            Serial.println(inputDataIDArray[l]);
+            Serial.print("command ");
+            Serial.println(command);*/
+            if (inputDataIDArray[l] == command){
+              //Serial.println("Command foumnd");
+              commandReceived = true;
+              break;
+            }
+          }  
+        }  
+        if (commandReceived && 0 <= value && 1023 >= value){
+          //Serial.println("Range found!");
+          commandReceived = true;
+        }else{
+          commandReceived = false;
+        }
       }else{
         commandReceived = false;
         message += incomingByte;
@@ -258,27 +296,25 @@ void loop() {
     Serial.println(command);
     Serial.print("value :");
     Serial.println(value);*/
-    if (command == "Y"){
-      Serial.print("MOD");
+    if (command == "Y"){ // Mode change
+      //Serial.println("Y");
       controllMode = value;
       receiverSerial.print("OK");
       receiverSerial.print(" ");
     }
-    else if (command == "X"){
+    else if (command == "X"){ // Alive message
       /*int rightC =  map(inputDataArray[RJX], 0, 1023, -255, 255);
       int leftC =  map(inputDataArray[LJX], 0, 1023, -255, 255);
       Serial.print("Alive Message");*/
-      receiverSerial.print("Z");
-      receiverSerial.print(controllMode);
-      receiverSerial.print("@");
-      receiverSerial.print(" ");
+      sendAck();
       /*Serial.print("right Chain:");
       Serial.print(rightC);
       Serial.print("left Chain:");
       Serial.print(leftC);*/
     }
-    else {
+    else { // Button press
       fillDataArrayWithInput(command, value);
+      sendAck();
       /*for (int i =0; i < RECEIVED_ARRAY_ELEMENTS; i++){
         if (inputDataIDArray[i] == command){
           Serial.print(inputDataIDArray[i]);
@@ -297,7 +333,8 @@ void loop() {
     checkAndSetBatteryStatus();
   }
   
-  if (currTime - lastAliveTime > CONN_LOST_TIME){
+  if (currTime - lastAliveTime > CONN_LOST_TIME && !lostConnection){
+    Serial.println("CONN_LOST");
     controllModePrev = controllMode;
     controllMode = DEFAULT_MODE;
     ControlChains(0, 0);
