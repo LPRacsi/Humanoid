@@ -39,17 +39,9 @@
 #define LJX 14
 #define LJY 15
 
-/**/
-#define CONN_LOST_TIME    3000  //3 s
+/******Timing defines*************/
 #define BATT_REFRESH_TIME 60000 //1 min
 
-/****** controll modes  **************/
-#define DRIVE_ONLY      0
-#define R_ARM_ONLY      1
-#define L_ARM_ONLY      2
-#define R_ARM_AND_DRIVE 3
-#define L_ARM_AND_DRIVE 4
-#define DEFAULT_MODE    100
 
 SoftwareSerial receiverSerial(R_SER_RX_PIN, R_SER_TX_PIN);
 
@@ -58,10 +50,6 @@ char incomingByte;
 String message, command;
 bool commandReceived, lostConnection;
 int value, controllMode, controllModePrev;
-/*String inputDataIDArray[] = {"rF2", "rF1", "lF2", "lF1",
-                            "bu4", "bu3", "bu2", "bu1",
-                            "up0", "rig", "lef", "dow",
-                            "rJX", "rJY", "lJX", "lJY"};*/
 unsigned short inputDataArray[RECEIVED_ARRAY_ELEMENTS];
 unsigned long currTime, lastAliveTime, lastBattUpdateTime;
 

@@ -3,6 +3,7 @@
 */
 #include <SoftwareSerial.h>
 #include <Servo.h>
+#include <common_for_robot.h>
 /*PIN definition*/
 #define R_SER_RX_PIN          2
 #define R_SER_TX_PIN          3
@@ -31,16 +32,8 @@
 #define LJX 14
 #define LJY 15
 
-/****** controll modes  **************/
-#define DRIVE_ONLY      0
-#define R_ARM_ONLY      1
-#define L_ARM_ONLY      2
-#define R_ARM_AND_DRIVE 3
-#define L_ARM_AND_DRIVE 4
-#define DEFAULT_MODE    100
 
 /******Timing defines*************/
-#define CONN_LOST_TIME    3000  //3 s
 #define ARM_UPDATE_TIME   100
 
 /**/
@@ -54,10 +47,6 @@ char incomingByte;
 String message, command;
 int value, controllMode, controllModePrev, rShoulderPos, rShoulderPos2, rElbowPos, rWristPos, rWristPos2, rHandPos;
 bool commandReceived, lostConnection;
-String inputDataIDArray[] = {"rF2", "rF1", "lF2", "lF1",
-                            "bu4", "bu3", "bu2", "bu1",
-                            "up0", "rig", "lef", "dow",
-                            "rJX", "rJY", "lJX", "lJY"};
 unsigned short inputDataArray[RECEIVED_ARRAY_ELEMENTS];
 unsigned long currTime, lastAliveTime, lastArmUpdateTime;
 
@@ -192,10 +181,35 @@ void loop() {
     }else{
       //Serial.println(incomingByte);
       if (incomingByte == '@'){//The control sign
-        command = message.substring(0,3);
-        value = message.substring(3).toInt();
+        command = message.substring(0,1);
+        value = message.substring(1).toInt();
         message = "";
-        commandReceived = true;
+        if (alive == command || modS == command){
+          //Serial.println("alive or mode!");        
+          commandReceived = true;
+        }else{      
+          for (int l =0; l < (sizeof(inputDataIDArray)/ sizeof(inputDataIDArray[0])); l++){          
+            /*Serial.print("(sizeof(inputDataIDArray)/ sizeof(inputDataIDArray[0])) ");
+            Serial.println((sizeof(inputDataIDArray)/ sizeof(inputDataIDArray[0])));          
+            Serial.print("l ");
+            Serial.println(l);          
+            Serial.print("inputDataIDArray[l] ");
+            Serial.println(inputDataIDArray[l]);
+            Serial.print("command ");
+            Serial.println(command);*/
+            if (inputDataIDArray[l] == command){
+              //Serial.println("Command foumnd");
+              commandReceived = true;
+              break;
+            }
+          }  
+        }  
+        if (commandReceived && 0 <= value && 1023 >= value){
+          //Serial.println("Range found!");
+          commandReceived = true;
+        }else{
+          commandReceived = false;
+        }
       }else{
         commandReceived = false;
         message += incomingByte;
@@ -208,14 +222,14 @@ void loop() {
       controllMode = controllModePrev;
       lostConnection = false;
     }
-    if (command == "Mod"){
+    if (command == "Y"){
       controllMode = value;
       Serial.print("controllMode :");
       Serial.println(controllMode); 
       //receiverSerial.print("OK");
       //receiverSerial.print(" ");
     }
-    else if (command == "ALI"){
+    else if (command == "X"){
       /*Do nothing here*/
     }
     else {
@@ -231,7 +245,7 @@ void loop() {
 
   currTime = millis();
   
-  if (currTime - lastAliveTime > CONN_LOST_TIME){
+  if (currTime - lastAliveTime > CONN_LOST_TIME && !lostConnection){
     controllModePrev = controllMode;
     controllMode = DEFAULT_MODE;
     lostConnection = true;

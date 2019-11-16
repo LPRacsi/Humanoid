@@ -1,5 +1,16 @@
+/****** controll modes  **************/
+#define DRIVE_ONLY      0
+#define R_ARM_ONLY      1
+#define L_ARM_ONLY      2
+#define R_ARM_AND_DRIVE 3
+#define L_ARM_AND_DRIVE 4
+#define DEFAULT_MODE    100
+
+/******Timing defines*************/
+#define CONN_LOST_TIME    3000  //3 s
 
 const String alive = "X";
+const String modS = "Y";
 const String controlSign = "@";
 const String ack = "Z";
 String inputDataIDArray[] = {"A",//"rF2", //Right front 2
